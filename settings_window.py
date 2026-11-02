@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import webbrowser
 
-from app_paths import DATA_DIR, restore_system_libraries
+from app_paths import ABSENCE_SCRIPT_PATH, DATA_DIR, restore_system_libraries
 from attendance_sheets import check_google_sheet, spreadsheet_url
 import google_auth
 import google_settings
@@ -35,6 +35,15 @@ def current_status():
         absence = "" if settings.get("auto_absence") else " • ยังไม่ได้ติดตั้งระบบสรุปขาดเรียนอัตโนมัติ"
         return f"เข้าสู่ระบบแล้ว: {settings.get('account') or 'บัญชี Google'} • บันทึกลงชีต {google_auth.SHEET_TITLE}{absence}"
     return f"เชื่อมด้วยไฟล์ key กับ Google Sheet: {settings['spreadsheet']}"
+
+
+ABSENCE_STEPS = """ไม่บังคับ • เพิ่มคนที่ไม่มาเป็นขาดเรียนหลังเวลาเลิกเรียน แม้ปิดคอมพิวเตอร์ ทำครั้งเดียว:
+1. กดปุ่มด้านล่าง โปรแกรมจะคัดลอกโค้ดและเปิดชีตให้
+2. ในชีต ไปที่ ส่วนขยาย → Apps Script แล้วลบโค้ดเดิมและวางโค้ดที่คัดลอกไว้ จากนั้นกดบันทึก
+3. เลือกฟังก์ชัน setupAttendanceAutomation กดเรียกใช้ แล้วกดอนุญาต ถ้า Google เตือนว่ายังไม่ได้ยืนยันแอป ให้กด Advanced แล้วกดชื่อโปรเจกต์เพื่อไปต่อ สคริปต์นี้อยู่ในบัญชีของคุณเอง
+4. กลับมาที่หน้านี้ แล้วกด ตรวจการเชื่อมต่อ
+
+ถ้าขึ้นว่าเปิดไฟล์ไม่ได้ อาจเป็นเพราะเบราว์เซอร์ล็อกอินหลายบัญชี ให้ทำในหน้าต่างไม่ระบุตัวตน และล็อกอินเฉพาะบัญชีนี้"""
 
 
 class SettingsWindow:
@@ -80,6 +89,11 @@ class SettingsWindow:
         self.save_button = ttk.Button(self.advanced, text="ทดสอบและบันทึก", command=self.test_and_save)
         self.save_button.pack(anchor="w", pady=(12, 0))
 
+        ttk.Label(panel, text="สรุปขาดเรียนอัตโนมัติ", style="Section.TLabel").pack(anchor="w", pady=(24, 4))
+        ttk.Label(panel, text=ABSENCE_STEPS, style="Subtitle.TLabel").pack(anchor="w", fill="x")
+        self.absence_button = ttk.Button(panel, text="เปิดระบบสรุปขาดเรียน", command=self.start_absence_setup)
+        self.absence_button.pack(anchor="w", pady=(8, 0))
+
         ttk.Label(panel, text="โฟลเดอร์ข้อมูลในเครื่อง", style="Section.TLabel").pack(anchor="w", pady=(24, 4))
         ttk.Label(panel, text=f"{DATA_DIR}\nเก็บรายชื่อ ข้อมูลใบหน้า และหลักฐานความยินยอม ไฟล์เหล่านี้ไม่ถูกลบเมื่อถอนการติดตั้ง", style="Subtitle.TLabel").pack(anchor="w", fill="x")
         ttk.Button(panel, text="เปิดโฟลเดอร์ข้อมูล", command=lambda: open_folder(DATA_DIR)).pack(anchor="w", pady=(8, 0))
@@ -106,6 +120,7 @@ class SettingsWindow:
         self.save_button.configure(state=state)
         self.check_button.configure(state=state if signed_in else "disabled")
         self.open_button.configure(state="normal" if settings_has_link(settings) else "disabled")
+        self.absence_button.configure(state="normal" if settings_has_link(settings) else "disabled")
 
     def toggle_advanced(self):
         if self.show_advanced.get():
@@ -159,6 +174,18 @@ class SettingsWindow:
         if url:
             restore_system_libraries()
             webbrowser.open(url)
+
+    def start_absence_setup(self):
+        try:
+            code = ABSENCE_SCRIPT_PATH.read_text(encoding="utf-8")
+        except OSError as exc:
+            self.notice.set(f"อ่านโค้ดระบบสรุปขาดเรียนไม่ได้: {exc}")
+            return
+        self.root.clipboard_clear()
+        self.root.clipboard_append(code)
+        self.root.update()
+        self.open_sheet()
+        self.notice.set("คัดลอกโค้ดแล้ว และเปิดชีตให้แล้ว ทำตามขั้นตอนด้านล่างโดยยังไม่ต้องปิดหน้าต่างนี้")
 
     def sign_out(self):
         if not google_settings.is_configured():

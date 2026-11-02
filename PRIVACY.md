@@ -1,6 +1,6 @@
 # นโยบายความเป็นส่วนตัวของ FaceCheck Attendance
 
-มีผลตั้งแต่วันที่ 2 พฤศจิกายน 2026 ([English below](#privacy-policy))
+มีผลตั้งแต่วันที่ 3 พฤศจิกายน 2026 ([English below](#privacy-policy))
 
 FaceCheck Attendance เป็นโปรแกรมโอเพนซอร์สสำหรับเช็คชื่อนักศึกษาด้วยใบหน้า ทำงานบนเครื่องของผู้ใช้ **ผู้พัฒนาไม่มีเซิร์ฟเวอร์ที่รับข้อมูลจากโปรแกรม และไม่ได้รับข้อมูลของผู้ใช้หรือนักศึกษา**
 
@@ -13,6 +13,7 @@ FaceCheck Attendance เป็นโปรแกรมโอเพนซอร�
 | สำเนาการเช็คชื่อด้วยมือ และรายการที่รอส่งเมื่อเชื่อมต่อไม่ได้ | เครื่องที่ติดตั้งโปรแกรม |
 | อีเมลบัญชี Google และรหัสของชีต | ไฟล์ตั้งค่าในเครื่องที่ติดตั้งโปรแกรม |
 | สิทธิ์การเข้าสู่ระบบ Google (refresh token) | keychain ของระบบปฏิบัติการในเครื่องนั้น |
+| รายชื่อและรหัสนักศึกษาของรอบเช็คชื่อ เมื่อผู้ใช้ติดตั้งระบบสรุปขาดเรียน | แท็บในชีตเดียวกัน บน Drive ของผู้ใช้ |
 
 โปรแกรมประมวลผลใบหน้าในเครื่อง และไม่ส่งภาพใบหน้าไปยัง Google หรือผู้พัฒนา
 
@@ -26,6 +27,13 @@ FaceCheck Attendance เป็นโปรแกรมโอเพนซอร�
 ข้อมูลจาก Google ถูกใช้เพื่อบันทึกและแสดงผลเช็คชื่อให้ผู้ใช้เท่านั้น ไม่ถูกขาย ไม่ถูกโอนให้บุคคลอื่น ไม่ถูกใช้โฆษณา และไม่ถูกใช้ฝึกโมเดล AI
 
 การใช้และการโอนข้อมูลที่ได้รับจาก Google APIs เป็นไปตาม [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy) รวมถึงข้อกำหนด Limited Use
+
+## บริการของ Google ที่ผู้ใช้เลือกใช้ได้
+
+- **สรุปขาดเรียนอัตโนมัติ:** ถ้าผู้ใช้ติดตั้ง Apps Script สคริปต์จะทำงานในบัญชี Google ของผู้ใช้ และเข้าถึงเฉพาะชีตที่ติดตั้ง
+- **รายงาน:** ปุ่มรายงานเปิด Data Studio ด้วยบัญชีของผู้ใช้ โดยนำรายงานต้นแบบที่ไม่มีข้อมูลจริงมาแสดงข้อมูลจากชีตของผู้ใช้ เจ้าของรายงานต้นแบบไม่ได้รับข้อมูลนี้ ตราบใดที่ผู้ใช้ไม่ได้แชร์ให้เอง
+
+การใช้บริการเหล่านี้เป็นไปตามข้อกำหนดของ Google
 
 ## ผู้รับผิดชอบข้อมูล
 
@@ -48,7 +56,7 @@ FaceCheck Attendance เป็นโปรแกรมโอเพนซอร�
 
 # Privacy Policy
 
-Effective November 2, 2026
+Effective November 3, 2026
 
 FaceCheck Attendance is an open-source app that takes student attendance by face recognition on the user's own computer. **The developer runs no server that receives data from the app and does not receive any user or student data.**
 
@@ -61,6 +69,7 @@ FaceCheck Attendance is an open-source app that takes student attendance by face
 | Copies of manual attendance and items waiting to be sent | The computer running the app |
 | Google account email and the sheet's ID | A settings file on the computer running the app |
 | Google sign-in permission (refresh token) | The operating system's keychain on that computer |
+| Round rosters of names and student IDs, if the user installs the absence system | A tab in the same sheet in the user's Drive |
 
 Faces are processed on the computer. Face images are not sent to Google or to the developer.
 
@@ -74,6 +83,13 @@ The app requests only these permissions:
 Data from Google is used only to record and show attendance to the user. It is not sold, not transferred to others, not used for advertising, and not used to train AI models.
 
 The app's use and transfer of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
+
+## Optional Google services
+
+- **Automatic absence summary:** if the user installs the Apps Script, it runs in the user's own Google account and accesses only the sheet it is installed in.
+- **Reports:** the report button opens Data Studio with the user's account, showing data from the user's sheet in a template report that holds no real data. The template's owner does not receive this data unless the user shares it.
+
+These services are subject to Google's terms.
 
 ## Who is responsible for the data
 

@@ -44,5 +44,6 @@ RESOURCE_DIR = resource_dir()
 DATA_DIR = user_data_dir()
 FACE_DETECTOR_PATH = RESOURCE_DIR / "data" / "haarcascade_frontalface_default.xml"
 MODEL_PATH = RESOURCE_DIR / "models" / "face_recognition_sface_2021dec.onnx"
+ABSENCE_SCRIPT_PATH = RESOURCE_DIR / "google_apps_script" / "AutoAbsence.gs"
 # ไม่อยู่ใน repo: ตอน build ตัวติดตั้ง GitHub Actions จะเขียนไฟล์นี้จาก secret
 OAUTH_CLIENT_PATH = RESOURCE_DIR / "oauth_client.json"

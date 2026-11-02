@@ -1,11 +1,12 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
+import queue
 import subprocess
 import sys
+import threading
 import json
 import webbrowser
 from app_paths import RESOURCE_DIR, is_packaged, restore_system_libraries
-from attendance_sheets import spreadsheet_url
 import google_settings
 from ui_theme import ResponsivePanel, apply_theme, page_header, window_size
 
@@ -72,17 +73,44 @@ def open_script(root, filename):
     root.after(500, check_finished)
 
 
-def open_report(root):
+def open_teacher_report(root, button):
+    """เตรียมแท็บรายงานครั้งแรกใช้เวลาสักครู่ จึงทำนอกหน้าต่างหลัก."""
+    results = queue.Queue()
+    label = button.cget("text")
+    button.configure(state="disabled", text="กำลังเตรียมรายงาน…")
+
+    def worker():
+        import teacher_report
+        try:
+            results.put(("ok", teacher_report.prepare_report()))
+        except Exception as exc:
+            results.put(("error", str(exc) or type(exc).__name__))
+
+    def check():
+        try:
+            event, value = results.get_nowait()
+        except queue.Empty:
+            root.after(200, check)
+            return
+        button.configure(state="normal", text=label)
+        if event == "error":
+            messagebox.showerror("เปิดรายงานไม่ได้", value, parent=root)
+            return
+        restore_system_libraries()
+        if not webbrowser.open(value):
+            messagebox.showerror("เปิดรายงานไม่ได้", f"เปิดเบราว์เซอร์ไม่ได้ กรุณาเปิดลิงก์นี้เอง:\n{value}", parent=root)
+
+    threading.Thread(target=worker, daemon=True).start()
+    root.after(200, check)
+
+
+def open_report(root, button):
     try:
         config = RESOURCE_DIR / "reports" / "looker_studio_config.json"
         if not config.is_file():
-            # ยังไม่ได้ตั้งค่า Looker Studio ให้เปิดชีตที่เก็บผลเช็คชื่อแทน
-            sheet = spreadsheet_url(google_settings.load())
-            if not sheet:
-                raise RuntimeError("กรุณาเข้าสู่ระบบ Google ก่อน ผลเช็คชื่อจะอยู่ในชีตบน Drive ของคุณ")
-            restore_system_libraries()
-            if not webbrowser.open(sheet):
-                raise RuntimeError(f"เปิดเบราว์เซอร์ไม่ได้ กรุณาเปิดลิงก์นี้เอง: {sheet}")
+            if not google_settings.load():
+                raise RuntimeError("กรุณาเข้าสู่ระบบ Google ก่อน รายงานจะใช้ข้อมูลจากชีตบน Drive ของคุณ")
+            open_teacher_report(root, button)
             return
         settings = json.loads(config.read_text(encoding="utf-8"))
         url = settings.get("saved_report_url") or settings["create_report_url"]
@@ -128,7 +156,8 @@ def main():
             command=lambda script=filename: open_script(root, script),
             style="Primary.TButton" if index == 2 else "TButton",
         ).pack(fill="x", side="bottom")
-    ttk.Button(panel, text="เปิดรายงานสรุปการเข้าเรียน ", command=lambda: open_report(root)).pack(fill="x", pady=(18, 0))
+    report_button = ttk.Button(panel, text="เปิดรายงานสรุปการเข้าเรียน ", command=lambda: open_report(root, report_button))
+    report_button.pack(fill="x", pady=(18, 0))
     ttk.Button(panel, text="เข้าสู่ระบบ Google และตั้งค่า", command=lambda: open_script(root, "settings_window")).pack(fill="x", pady=(10, 0))
     footer = ttk.Label(panel, text="เลือกเมนูที่ต้องการ • แต่ละเมนูเปิดเป็นหน้าต่างแยก", style="Subtitle.TLabel")
     footer.pack(anchor="w", fill="x", pady=(10, 0))

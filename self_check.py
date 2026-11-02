@@ -1,4 +1,5 @@
 """ตรวจตัวแพ็กบนเครื่อง build โดยไม่ใช้กล้องและไม่แตะข้อมูลจริง: menu.py --self-check รายงาน.txt"""
+import json
 import os
 import pickle
 import subprocess
@@ -10,7 +11,12 @@ TOOL_WAIT_SECONDS = 12
 
 
 def check_files():
-    from app_paths import FACE_DETECTOR_PATH, MODEL_PATH
+    from app_paths import ABSENCE_SCRIPT_PATH, FACE_DETECTOR_PATH, MODEL_PATH
+    import teacher_report
+    json.loads(teacher_report.TERMS_PATH.read_text(encoding="utf-8"))
+    teacher_report.load_template()
+    if "setupAttendanceAutomation" not in ABSENCE_SCRIPT_PATH.read_text(encoding="utf-8"):
+        raise RuntimeError("ไม่พบโค้ดระบบสรุปขาดเรียน")
     import cv2
     if cv2.CascadeClassifier(str(FACE_DETECTOR_PATH)).empty():
         raise RuntimeError(f"โหลดตัวตรวจจับใบหน้าไม่ได้: {FACE_DETECTOR_PATH}")

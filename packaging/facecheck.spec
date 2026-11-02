@@ -17,6 +17,9 @@ a = Analysis(
         (str(ROOT / "models" / "face_recognition_sface_2021dec.onnx"), "models"),
         (str(ROOT / "models" / "SFace-LICENSE"), "models"),
         (str(ROOT / "LICENSE"), "."),
+        (str(ROOT / "google_apps_script" / "AutoAbsence.gs"), "google_apps_script"),
+        (str(ROOT / "reports" / "academic_terms.json"), "reports"),
+        (str(ROOT / "reports" / "report_template.json"), "reports"),
         *([(str(OAUTH_CLIENT), ".")] if OAUTH_CLIENT.is_file() else []),
         # keyring finds its OS backend through package metadata at runtime.
         *copy_metadata("keyring"),

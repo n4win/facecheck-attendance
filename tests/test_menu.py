@@ -49,6 +49,21 @@ class MenuTests(unittest.TestCase):
             menu.open_script(root, "add_face_student")
             popen.assert_called_once_with(["add_face_student"])
 
+    def test_report_button_requires_sign_in_when_no_saved_report(self):
+        missing = unittest.mock.MagicMock()
+        missing.__truediv__.return_value = missing
+        missing.is_file.return_value = False
+        root, button = unittest.mock.Mock(), unittest.mock.Mock()
+        with patch.object(menu, "RESOURCE_DIR", missing), patch.object(menu.messagebox, "showerror") as error, \
+             patch.object(menu, "open_teacher_report") as report:
+            with patch.object(menu.google_settings, "load", return_value=None):
+                menu.open_report(root, button)
+            error.assert_called_once()
+            report.assert_not_called()
+            with patch.object(menu.google_settings, "load", return_value={"spreadsheet_id": "id"}):
+                menu.open_report(root, button)
+            report.assert_called_once_with(root, button)
+
     def test_self_check_refuses_to_run_against_real_data(self):
         with patch.dict(os.environ):
             os.environ.pop("FACECHECK_DATA_DIR", None)
