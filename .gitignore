@@ -1,0 +1,23 @@
+# Secrets: Google service account keys sit at the project root
+/*.json
+
+# ข้อมูลนักศึกษา (เก็บไว้เฉพาะไฟล์ตรวจจับใบหน้า)
+data/*
+!data/haarcascade_frontalface_default.xml
+Attendance/
+documents/
+docs/screenshots/
+docs/TEACHER_DASHBOARD.md
+docs/ABSENCE_DASHBOARD.md
+docs/AUTO_ABSENCE_HISTORY.md
+reports/LOOKER_STUDIO_SETUP.md
+reports/looker_studio_config.json
+reports/absence_report_config.json
+
+# ไฟล์ที่ระบบสร้างเอง
+__pycache__/
+.DS_Store
+.venv/
+build/
+dist/
+installers/

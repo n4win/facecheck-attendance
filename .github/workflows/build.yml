@@ -1,0 +1,98 @@
+name: Build installers
+
+on:
+  push:
+    # Branch pushes build only when packaging changes; a tag always builds and drafts a release.
+    branches: ["**"]
+    tags: ["v*"]
+    paths: ["packaging/**", ".github/workflows/build.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, name: linux }
+          - { os: windows-2022, name: windows }
+          - { os: macos-15, name: macos-arm64, dmg: FaceCheck-Attendance-macOS-AppleSilicon.dmg }
+          - { os: macos-15-intel, name: macos-intel, dmg: FaceCheck-Attendance-macOS-Intel.dmg }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      FACECHECK_DATA_DIR: ${{ github.workspace }}/check-data
+      VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.0.0' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r packaging/requirements-build.txt
+      - name: Install Linux GUI libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1 libegl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
+      - name: Unit tests
+        shell: bash
+        run: python -m unittest discover -s tests
+      - name: Build bundle
+        run: pyinstaller packaging/facecheck.spec --noconfirm --distpath dist --workpath build
+
+      - name: Package and check (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a dist/FaceCheckAttendance/FaceCheckAttendance --self-check self-check.txt
+          packaging/build_linux.sh "${VERSION#v}"
+      - name: Package and check (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          "dist/FaceCheck Attendance.app/Contents/MacOS/FaceCheckAttendance" --self-check "$PWD/self-check.txt"
+          mkdir -p installers dmg
+          cp -R "dist/FaceCheck Attendance.app" dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "FaceCheck Attendance" -srcfolder dmg -ov -format UDZO "installers/${{ matrix.dmg }}"
+      - name: Package and check (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppVersion=$($env:VERSION.TrimStart('v'))" packaging\windows.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $setup = Start-Process installers\FaceCheck-Attendance-Windows-x64-Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          if ($setup.ExitCode) { exit $setup.ExitCode }
+          $app = Start-Process "C:\Program Files\FaceCheck Attendance\FaceCheckAttendance.exe" -ArgumentList '--self-check',"$PWD\self-check.txt" -Wait -PassThru
+          exit $app.ExitCode
+
+      - name: Show self-check report
+        if: always()
+        shell: bash
+        run: cat self-check.txt || true
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.name }}
+          path: installers/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: installers
+          merge-multiple: true
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" installers/* --draft --title "$TAG" --generate-notes
