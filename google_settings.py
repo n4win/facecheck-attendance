@@ -1,4 +1,4 @@
-"""ค่าการเชื่อม Google Sheets ของผู้ใช้แต่ละคน ถ้าไม่ตั้งค่า โปรแกรมจะบันทึกในเครื่องอย่างเดียว."""
+"""ค่าการเชื่อม Google Sheets ของผู้ใช้แต่ละคน: บัญชีที่เข้าสู่ระบบ หรือไฟล์ key แบบขั้นสูง."""
 import json
 import os
 from pathlib import Path
@@ -14,13 +14,15 @@ def is_configured():
 
 
 def load():
-    """ไม่มีไฟล์ตั้งค่าคือโหมดในเครื่อง แต่ถ้าไฟล์เสีย ต้องแจ้งเตือนแทนการบันทึกผิดที่เงียบ ๆ."""
+    """คืน None เมื่อยังไม่ได้เชื่อม ถ้าไฟล์เสียต้องแจ้งเตือน เพื่อไม่ให้ผู้ใช้เข้าใจว่าส่งข้อมูลสำเร็จ."""
     if not is_configured():
         return None
     try:
         settings = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise ValueError(f"อ่านค่าการเชื่อม Google ไม่ได้ กรุณาตั้งค่าใหม่: {exc}") from None
+    if isinstance(settings, dict) and str(settings.get("spreadsheet_id", "")).strip():
+        return settings
     if not isinstance(settings, dict) or not str(settings.get("spreadsheet", "")).strip():
         raise ValueError("ค่าการเชื่อม Google ไม่ครบ กรุณาตั้งค่าใหม่")
     if not KEY_PATH.is_file():
@@ -66,6 +68,12 @@ def save(spreadsheet, key_source=None, auto_absence=False):
     elif not KEY_PATH.is_file():
         raise ValueError("กรุณาเลือกไฟล์ key ของ service account")
     write_private(SETTINGS_PATH, json.dumps({"spreadsheet": spreadsheet, "auto_absence": auto_absence}, ensure_ascii=False, indent=2))
+
+
+def save_account(spreadsheet_id, account, auto_absence=False):
+    """บันทึกชีตของบัญชีที่เข้าสู่ระบบ ส่วน token อยู่ใน keychain ไม่อยู่ในไฟล์นี้."""
+    KEY_PATH.unlink(missing_ok=True)
+    write_private(SETTINGS_PATH, json.dumps({"spreadsheet_id": spreadsheet_id, "account": account, "auto_absence": auto_absence}, ensure_ascii=False, indent=2))
 
 
 def clear():

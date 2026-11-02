@@ -30,7 +30,19 @@ def user_data_dir():
     return base / APP_NAME
 
 
+def restore_system_libraries():
+    """ตัวแพ็กบน Linux เปลี่ยน LD_LIBRARY_PATH ต้องคืนค่าก่อนเปิดเบราว์เซอร์หรือโปรแกรมของระบบ."""
+    if not is_packaged():
+        return
+    original = os.environ.pop("LD_LIBRARY_PATH_ORIG", None)
+    os.environ.pop("LD_LIBRARY_PATH", None)
+    if original:
+        os.environ["LD_LIBRARY_PATH"] = original
+
+
 RESOURCE_DIR = resource_dir()
 DATA_DIR = user_data_dir()
 FACE_DETECTOR_PATH = RESOURCE_DIR / "data" / "haarcascade_frontalface_default.xml"
 MODEL_PATH = RESOURCE_DIR / "models" / "face_recognition_sface_2021dec.onnx"
+# ไม่อยู่ใน repo: ตอน build ตัวติดตั้ง GitHub Actions จะเขียนไฟล์นี้จาก secret
+OAUTH_CLIENT_PATH = RESOURCE_DIR / "oauth_client.json"

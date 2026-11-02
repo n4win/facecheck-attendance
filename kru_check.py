@@ -200,7 +200,7 @@ class AttendanceWindow:
     def __init__(self, root, store):
         self.root, self.store = root, store
         self.sheets = AttendanceSheets()
-        self.destination = "Google Sheets" if google_settings.is_configured() else "ไฟล์ในเครื่อง"
+        self.destination = "Google Sheets"
         self.absence_summary = google_settings.absence_summary_enabled()
         self.sync_results = queue.Queue()
         self.syncing = False

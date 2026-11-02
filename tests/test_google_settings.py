@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import attendance_sheets
-from attendance_sheets import AttendanceSheets, HEADERS, LocalWorksheet
+from attendance_sheets import AttendanceSheets, HEADERS, SIGN_IN_REQUIRED, spreadsheet_url
 import google_settings
 import scanstu as scan
 
@@ -21,18 +21,38 @@ class SettingsCase(unittest.TestCase):
             patcher = patch.object(google_settings, name, value)
             patcher.start()
             self.addCleanup(patcher.stop)
-        patcher = patch.object(attendance_sheets, "LOCAL_RECORDS", self.dir / "records.csv")
-        patcher.start()
-        self.addCleanup(patcher.stop)
         self.key = self.dir / "download.json"
         self.key.write_text(json.dumps({"type": "service_account", "client_email": "bot@example.test", "private_key": "secret"}))
 
 
 class GoogleSettingsTests(SettingsCase):
-    def test_not_configured_means_local_mode(self):
+    def test_attendance_requires_sign_in_and_never_writes_a_local_copy(self):
         self.assertIsNone(google_settings.load())
         self.assertFalse(google_settings.absence_summary_enabled())
-        self.assertIsInstance(AttendanceSheets().connect(), LocalWorksheet)
+        with self.assertRaisesRegex(ValueError, SIGN_IN_REQUIRED):
+            AttendanceSheets().connect()
+        with self.assertRaisesRegex(ValueError, SIGN_IN_REQUIRED):
+            scan.ScanSheets().today("14-09-2026")
+        self.assertEqual([path.name for path in self.dir.iterdir()], ["download.json"])
+
+    def test_signed_in_account_opens_its_own_sheet(self):
+        google_settings.save_account("sheet-id", "teacher@example.test", True)
+        with patch("google_auth.open_worksheet", return_value="sheet") as opener:
+            self.assertEqual(AttendanceSheets().connect(), "sheet")
+        opener.assert_called_once_with("sheet-id")
+        self.assertTrue(google_settings.absence_summary_enabled())
+
+    def test_sign_in_replaces_key_mode_and_removes_the_key_copy(self):
+        google_settings.save("ชีต", self.key)
+        google_settings.save_account("sheet-id", "teacher@example.test")
+        self.assertFalse(google_settings.KEY_PATH.exists())
+        self.assertEqual(google_settings.load()["spreadsheet_id"], "sheet-id")
+
+    def test_spreadsheet_link_for_each_mode(self):
+        self.assertIsNone(spreadsheet_url(None))
+        self.assertIsNone(spreadsheet_url({"spreadsheet": "ชื่อชีต"}))
+        self.assertEqual(spreadsheet_url({"spreadsheet": "https://docs.google.com/x"}), "https://docs.google.com/x")
+        self.assertIn("/d/abc/", spreadsheet_url({"spreadsheet_id": "abc"}))
 
     def test_save_copies_key_privately_and_round_trips(self):
         google_settings.save(" ชีตของฉัน ", self.key, auto_absence=True)
@@ -58,7 +78,6 @@ class GoogleSettingsTests(SettingsCase):
         google_settings.SETTINGS_PATH.write_text("{broken")
         with self.assertRaises(ValueError):
             AttendanceSheets().connect()
-        self.assertFalse(attendance_sheets.LOCAL_RECORDS.exists())
 
     def test_clear_removes_key_copy(self):
         google_settings.save("ชีต", self.key)
@@ -86,9 +105,8 @@ class GoogleSettingsTests(SettingsCase):
 
 
 class OpenSessionTests(SettingsCase):
-    def test_local_mode_and_no_absence_system_skip_session(self):
+    def test_no_absence_system_skips_session(self):
         with patch("attendance_sessions.publish_session") as publish:
-            self.assertEqual(AttendanceSheets().open_session("r", "14-09-2026", []), 0)
             google_settings.save("ชีต", self.key, auto_absence=False)
             self.assertEqual(AttendanceSheets(Mock()).open_session("r", "14-09-2026", []), 0)
         publish.assert_not_called()
@@ -99,42 +117,6 @@ class OpenSessionTests(SettingsCase):
         with patch("attendance_sessions.publish_session", return_value=3) as publish:
             self.assertEqual(AttendanceSheets(sheet).open_session("r", "14-09-2026", [], "17:00"), 3)
         publish.assert_called_once_with(sheet, "r", "14-09-2026", [], end_time="17:00")
-
-
-class LocalWorksheetTests(SettingsCase):
-    def setUp(self):
-        super().setUp()
-        self.item = dict(day="2026-09-14", student_id="001", name="สมใจ, ใจดี", status="มา", updated_at="08:00:00")
-
-    def rows(self):
-        return LocalWorksheet(attendance_sheets.LOCAL_RECORDS).get_all_values()
-
-    def test_manual_check_adds_updates_and_cancels(self):
-        sheets = AttendanceSheets()
-        sheets.send(self.item)
-        self.assertEqual(self.rows(), [HEADERS, ["14-09-2026", "สมใจ, ใจดี", "001", "08:00:00", "ตรงเวลา", "ไม่มีหมายเหตุ"]])
-        sheets.send({**self.item, "status": "มาสาย", "updated_at": "09:00:00"})
-        self.assertEqual(self.rows()[1][3:5], ["09:00:00", "มาสาย"])
-        self.assertEqual(len(self.rows()), 2)
-        sheets.send({**self.item, "status": None})
-        self.assertEqual(self.rows(), [HEADERS])
-
-    def test_scan_save_once_keeps_first_record_and_today_reads_it(self):
-        sheets = scan.ScanSheets()
-        self.assertEqual(sheets.today("14-09-2026"), [])
-        first = dict(zip(HEADERS, ["14-09-2026", "สมใจ", "001", "08:00:00", "ตรงเวลา", "ไม่มีหมายเหตุ"]))
-        self.assertEqual(sheets.save_once(first), first)
-        later = {**first, "TIME": "09:00:00", "STATUS": "มาสาย"}
-        self.assertEqual(sheets.save_once(later)["TIME"], "08:00:00")
-        self.assertEqual(len(scan.ScanSheets().today("14-09-2026")), 1)
-
-    def test_file_opens_in_excel_with_thai_text(self):
-        AttendanceSheets().send(self.item)
-        self.assertTrue(attendance_sheets.LOCAL_RECORDS.read_bytes().startswith(b"\xef\xbb\xbf"))
-
-    def test_google_only_commands_explain_themselves(self):
-        with self.assertRaises(ValueError):
-            AttendanceSheets().connect().spreadsheet
 
 
 class FirstRunTests(unittest.TestCase):

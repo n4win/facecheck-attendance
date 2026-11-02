@@ -3,7 +3,11 @@
 from pathlib import Path
 import sys
 
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
+
 ROOT = Path(SPECPATH).parent
+# Written from a GitHub Actions secret when building a release; never committed.
+OAUTH_CLIENT = ROOT / "oauth_client.json"
 
 a = Analysis(
     [str(ROOT / "menu.py")],
@@ -13,9 +17,12 @@ a = Analysis(
         (str(ROOT / "models" / "face_recognition_sface_2021dec.onnx"), "models"),
         (str(ROOT / "models" / "SFace-LICENSE"), "models"),
         (str(ROOT / "LICENSE"), "."),
+        *([(str(OAUTH_CLIENT), ".")] if OAUTH_CLIENT.is_file() else []),
+        # keyring finds its OS backend through package metadata at runtime.
+        *copy_metadata("keyring"),
     ],
-    # Pillow loads this at runtime for the camera preview; analysis cannot see it.
-    hiddenimports=["PIL._tkinter_finder"],
+    # Pillow loads _tkinter_finder at runtime for the camera preview; analysis cannot see it.
+    hiddenimports=["PIL._tkinter_finder", *collect_submodules("keyring.backends")],
 )
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="FaceCheckAttendance", console=False)

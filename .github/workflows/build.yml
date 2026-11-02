@@ -41,6 +41,17 @@ jobs:
       - name: Unit tests
         shell: bash
         run: python -m unittest discover -s tests
+      - name: Add Google sign-in client
+        shell: bash
+        env:
+          OAUTH_CLIENT: ${{ secrets.GOOGLE_OAUTH_CLIENT_JSON }}
+        run: |
+          if [ -n "$OAUTH_CLIENT" ]; then
+            printf '%s' "$OAUTH_CLIENT" > oauth_client.json
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "::error::A release needs the GOOGLE_OAUTH_CLIENT_JSON secret, or its sign-in button would not work."
+            exit 1
+          fi
       - name: Build bundle
         run: pyinstaller packaging/facecheck.spec --noconfirm --distpath dist --workpath build
 

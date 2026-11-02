@@ -152,7 +152,7 @@ class FaceAttendanceApp:
         self.end_time_var = tk.StringVar(value=end_initial)
         ttk.Entry(self.setup, textvariable=self.end_time_var, width=9).pack(anchor="w", pady=(6, 6))
         ttk.Label(self.setup, text="หลังเวลาเลิกเรียน Google ตรวจทุกประมาณ 15 นาที แล้วเพิ่มผู้ที่ยังไม่เช็คชื่อเป็นขาดเรียน" if google_settings.absence_summary_enabled()
-                  else "ใช้เวลาเลิกเรียนเมื่อเชื่อม Google Sheets และติดตั้งระบบสรุปขาดเรียน ตอนนี้ยังไม่สรุปขาดเรียนอัตโนมัติ",
+                  else "ใช้เวลาเลิกเรียนเมื่อติดตั้งระบบสรุปขาดเรียนในชีตแล้ว ตอนนี้ยังไม่สรุปขาดเรียนอัตโนมัติ",
                   style="Subtitle.TLabel", wraplength=570).pack(anchor="w", pady=(0, 12))
         self.preview = tk.StringVar()
         ttk.Label(self.setup, textvariable=self.preview, style="Summary.TLabel", wraplength=560).pack(fill="x")
@@ -312,7 +312,7 @@ class FaceAttendanceApp:
         table = ttk.Frame(right)
         table.pack(fill="both", expand=True)
         self.tree = ttk.Treeview(table, columns=("id", "name", "time", "status", "sync"), show="headings")
-        for key, title, width in (("id", "รหัส", 80), ("name", "ชื่อ-นามสกุล", 170), ("time", "เวลา", 75), ("status", "สถานะ", 75), ("sync", "การบันทึก", 110)):
+        for key, title, width in (("id", "รหัส", 80), ("name", "ชื่อ-นามสกุล", 170), ("time", "เวลา", 75), ("status", "สถานะ", 75), ("sync", "Google Sheets", 110)):
             self.tree.heading(key, text=title)
             self.tree.column(key, width=width, minwidth=60)
         self.tree.pack(side="left", fill="both", expand=True)

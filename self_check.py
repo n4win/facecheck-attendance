@@ -20,12 +20,32 @@ def check_files():
 
 def check_google_modules():
     import gspread
+    import keyring
+    from keyring.backends import fail
+    from google_auth_oauthlib.flow import InstalledAppFlow
     from oauth2client.service_account import ServiceAccountCredentials
     from attendance_sessions import THAILAND
-    return gspread.__version__, ServiceAccountCredentials.__name__, str(THAILAND)
+    # Linux บนเครื่อง build ไม่มี Secret Service แต่ Windows และ macOS ต้องมีเสมอ
+    if sys.platform in ("win32", "darwin") and isinstance(keyring.get_keyring(), fail.Keyring):
+        raise RuntimeError("ไม่พบ keychain ของระบบในตัวแพ็ก")
+    return gspread.__version__, InstalledAppFlow.__name__, ServiceAccountCredentials.__name__, str(THAILAND)
 
 
-def check_local_attendance():
+class MemorySheet:
+    def __init__(self):
+        self.rows = []
+
+    def get_all_values(self):
+        return [list(row) for row in self.rows]
+
+    def update(self, range_name, values, value_input_option=None):
+        self.rows[:1] = values
+
+    def append_row(self, values, value_input_option=None):
+        self.rows.append(values)
+
+
+def check_attendance_flow():
     from app_paths import DATA_DIR
     import numpy as np
     import scanstu as scan
@@ -37,14 +57,13 @@ def check_local_attendance():
         with (DATA_DIR / name).open("wb") as handle:
             pickle.dump(value, handle)
     app = scan.FaceAttendanceApp.__new__(scan.FaceAttendanceApp)
-    app.sheets, app.similarity_threshold = scan.ScanSheets(), 0.40
+    sheet = MemorySheet()
+    app.sheets, app.similarity_threshold = scan.ScanSheets(sheet), 0.40
     _, students, matcher = app.prepare_session("14-09-2026")
     matcher.match(faces[0].reshape(50, 50, 3))
-    if app.sheets.open_session("self-check", "14-09-2026", [{"name": "A", "student_id": "001"}], "17:00") != 0:
-        raise RuntimeError("โหมดในเครื่องไม่ควรส่งรอบเช็คชื่อ")
     app.sheets.save_once(dict(zip(scan.HEADERS, ["14-09-2026", "A", students["A"], "08:00:00", "ตรงเวลา", "ไม่มีหมายเหตุ"])))
-    if len(scan.ScanSheets().today("14-09-2026")) != 1:
-        raise RuntimeError("อ่านผลเช็คชื่อในเครื่องกลับมาไม่ได้")
+    if len(scan.ScanSheets(sheet).today("14-09-2026")) != 1:
+        raise RuntimeError("อ่านผลเช็คชื่อกลับมาไม่ได้")
 
 
 def check_tools(names, tool_command):
@@ -80,7 +99,7 @@ def run(report_path, tool_names, tool_command):
         print("ต้องตั้ง FACECHECK_DATA_DIR เป็นโฟลเดอร์ชั่วคราวก่อน เพื่อไม่ให้แตะข้อมูลจริง", file=sys.stderr)
         return 2
     steps = (("files", check_files), ("google modules", check_google_modules),
-             ("local attendance", check_local_attendance),
+             ("attendance flow", check_attendance_flow),
              ("tool windows", lambda: check_tools(tool_names, tool_command)),
              ("preview and capture window", check_preview_and_capture_window))
     failed = False

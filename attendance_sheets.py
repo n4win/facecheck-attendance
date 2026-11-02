@@ -1,59 +1,23 @@
-"""Attendance destination: the user's Google Sheet, or a local CSV; no network on import."""
-import csv
+"""Attendance destination: the Google Sheet of the signed-in user; no network on import."""
 from datetime import date
-import os
-from pathlib import Path
-import re
 
-from app_paths import DATA_DIR
 import google_settings
 
 HEADERS = ["DATE", "NAME", "STUDENT_ID", "TIME", "STATUS", "ANNOTATION"]
-LOCAL_RECORDS = DATA_DIR / "attendance_records.csv"
+SIGN_IN_REQUIRED = "กรุณาเข้าสู่ระบบ Google ก่อนเช็คชื่อ จากปุ่มตั้งค่าในเมนูหลัก"
 
 
 def valid_headers(values):
     return [value.strip().upper() for value in values[:6]] == HEADERS
 
 
-class LocalWorksheet:
-    """ไฟล์ CSV ที่มีเมธอดเท่าที่โปรแกรมใช้จาก Google worksheet ใช้เมื่อไม่ได้เชื่อม Google."""
-
-    def __init__(self, path):
-        self.path = Path(path)
-
-    @property
-    def spreadsheet(self):
-        raise ValueError("คำสั่งนี้ต้องเชื่อม Google Sheets ก่อน")
-
-    def get_all_values(self):
-        if not self.path.exists():
-            return []
-        # utf-8-sig ทำให้ Excel แสดงภาษาไทยถูกต้อง
-        with self.path.open(encoding="utf-8-sig", newline="") as handle:
-            return list(csv.reader(handle))
-
-    def write(self, rows):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_name(f"{self.path.name}.{os.getpid()}.tmp")
-        with temporary.open("w", encoding="utf-8-sig", newline="") as handle:
-            csv.writer(handle).writerows(rows)
-        temporary.replace(self.path)
-
-    def update(self, range_name, values, value_input_option=None):
-        row = int(re.fullmatch(r"A(\d+):F\1", range_name).group(1))
-        rows = self.get_all_values()
-        rows.extend([] for _ in range(row - len(rows)))
-        rows[row - 1] = values[0]
-        self.write(rows)
-
-    def append_row(self, values, value_input_option=None):
-        self.write(self.get_all_values() + [values])
-
-    def delete_rows(self, index):
-        rows = self.get_all_values()
-        del rows[index - 1]
-        self.write(rows)
+def spreadsheet_url(settings):
+    if not settings:
+        return None
+    if settings.get("spreadsheet_id"):
+        return f"https://docs.google.com/spreadsheets/d/{settings['spreadsheet_id']}/edit"
+    link = str(settings.get("spreadsheet", ""))
+    return link if link.startswith("https://") else None
 
 
 def open_google_worksheet(spreadsheet, key_path):
@@ -86,7 +50,10 @@ class AttendanceSheets:
         if self.worksheet is None:
             settings = google_settings.load()
             if settings is None:
-                self.worksheet = LocalWorksheet(LOCAL_RECORDS)
+                raise ValueError(SIGN_IN_REQUIRED)
+            if "spreadsheet_id" in settings:
+                import google_auth
+                self.worksheet = google_auth.open_worksheet(settings["spreadsheet_id"])
             else:
                 self.worksheet = open_google_worksheet(settings["spreadsheet"], google_settings.KEY_PATH)
         return self.worksheet
@@ -95,7 +62,7 @@ class AttendanceSheets:
         sheet = self.connect()
         settings = google_settings.load()
         # รอบเช็คชื่อมีไว้ให้ Apps Script สรุปขาดเรียน ถ้าไม่ได้ติดตั้งก็ไม่ต้องส่ง
-        if isinstance(sheet, LocalWorksheet) or (settings is not None and not settings.get("auto_absence", True)):
+        if settings is not None and not settings.get("auto_absence", True):
             return 0
         from attendance_sessions import publish_session
         return publish_session(sheet, session_id, day, students, end_time=end_time)

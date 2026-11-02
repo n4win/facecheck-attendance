@@ -4,4 +4,6 @@ scikit-learn
 pillow
 gspread>=6,<7
 oauth2client
+google-auth-oauthlib
+keyring
 tzdata; sys_platform == "win32"

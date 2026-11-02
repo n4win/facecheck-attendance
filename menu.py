@@ -4,7 +4,9 @@ import subprocess
 import sys
 import json
 import webbrowser
-from app_paths import RESOURCE_DIR, is_packaged
+from app_paths import RESOURCE_DIR, is_packaged, restore_system_libraries
+from attendance_sheets import spreadsheet_url
+import google_settings
 from ui_theme import ResponsivePanel, apply_theme, page_header, window_size
 
 MENU_ITEMS = (
@@ -14,6 +16,7 @@ MENU_ITEMS = (
     ("เช็คชื่อด้วยอาจารย์ผู้สอนเอง", "kru_check"),
 )
 TOOL_FLAG = "--tool"
+SIGN_IN_TOOLS = {"scanstu", "kru_check"}
 
 
 def run_tool(name):
@@ -44,6 +47,10 @@ def tool_command(name):
 
 
 def open_script(root, filename):
+    if filename in SIGN_IN_TOOLS and not google_settings.is_configured():
+        if messagebox.askyesno("ต้องเข้าสู่ระบบ Google", "การเช็คชื่อจะบันทึกลงชีตบน Google Drive ของคุณ จึงต้องเข้าสู่ระบบก่อน\nไปที่หน้าเข้าสู่ระบบเลยหรือไม่?", parent=root):
+            open_script(root, "settings_window")
+        return
     try:
         # แยกโปรเซสเพื่อให้หน้าต่างหลักยังตอบสนองระหว่างใช้งาน
         process = subprocess.Popen(tool_command(filename))
@@ -69,7 +76,14 @@ def open_report(root):
     try:
         config = RESOURCE_DIR / "reports" / "looker_studio_config.json"
         if not config.is_file():
-            raise RuntimeError("ยังไม่ได้ตั้งค่ารายงาน Looker Studio ผลการเช็คชื่อดูได้จากไฟล์ในโฟลเดอร์ข้อมูล หรือ Google Sheet ที่เชื่อมไว้")
+            # ยังไม่ได้ตั้งค่า Looker Studio ให้เปิดชีตที่เก็บผลเช็คชื่อแทน
+            sheet = spreadsheet_url(google_settings.load())
+            if not sheet:
+                raise RuntimeError("กรุณาเข้าสู่ระบบ Google ก่อน ผลเช็คชื่อจะอยู่ในชีตบน Drive ของคุณ")
+            restore_system_libraries()
+            if not webbrowser.open(sheet):
+                raise RuntimeError(f"เปิดเบราว์เซอร์ไม่ได้ กรุณาเปิดลิงก์นี้เอง: {sheet}")
+            return
         settings = json.loads(config.read_text(encoding="utf-8"))
         url = settings.get("saved_report_url") or settings["create_report_url"]
         if not url.startswith(("https://lookerstudio.google.com/", "https://datastudio.google.com/")):
@@ -96,7 +110,7 @@ def main():
         "เพิ่มนักศึกษาใหม่ พร้อมอ่านและยืนยัน\nความยินยอมก่อนบันทึกใบหน้า",
         "ค้นหา แก้ไขชื่อและรหัสนักศึกษา\nหรือจัดการข้อมูลใบหน้าที่บันทึกไว้",
         "ตั้งเวลาเข้าเรียนและเช็คชื่อผ่านกล้อง\nดูผลการเช็คชื่อได้ทันที",
-        "เลือกนักศึกษาและระบุสถานะด้วยมือ\nบันทึกในเครื่องหรือส่งไป Google Sheets",
+        "เลือกนักศึกษาและระบุสถานะด้วยมือ\nพร้อมส่งข้อมูลไป Google Sheets",
     )
     for index, (label, filename) in enumerate(MENU_ITEMS):
         card = ttk.Frame(cards, style="Card.TFrame", padding=24)
@@ -115,7 +129,7 @@ def main():
             style="Primary.TButton" if index == 2 else "TButton",
         ).pack(fill="x", side="bottom")
     ttk.Button(panel, text="เปิดรายงานสรุปการเข้าเรียน ", command=lambda: open_report(root)).pack(fill="x", pady=(18, 0))
-    ttk.Button(panel, text="ตั้งค่า Google Sheets และโฟลเดอร์ข้อมูล", command=lambda: open_script(root, "settings_window")).pack(fill="x", pady=(10, 0))
+    ttk.Button(panel, text="เข้าสู่ระบบ Google และตั้งค่า", command=lambda: open_script(root, "settings_window")).pack(fill="x", pady=(10, 0))
     footer = ttk.Label(panel, text="เลือกเมนูที่ต้องการ • แต่ละเมนูเปิดเป็นหน้าต่างแยก", style="Subtitle.TLabel")
     footer.pack(anchor="w", fill="x", pady=(10, 0))
     pending_layout = None
