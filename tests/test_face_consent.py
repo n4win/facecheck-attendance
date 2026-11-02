@@ -1,3 +1,4 @@
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -76,7 +77,7 @@ class FaceConsentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "consents.sqlite3"
             face_consent.record_consent("ชื่อทดสอบ", "001", notice, path)
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 row = db.execute("SELECT student_id, notice, policy_version, decision, consented_at FROM consents").fetchone()
             self.assertEqual(row[:4], ("001", notice, face_consent.POLICY_VERSION, "explicitly_agreed"))
             self.assertTrue(row[4])

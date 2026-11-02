@@ -211,14 +211,14 @@ class PendingTests(unittest.TestCase):
         row = dict(zip(HEADERS, ["14-09-2026", "นักศึกษา", "001", "08:31:00", "มาสาย", "รถติด"]))
         with tempfile.TemporaryDirectory() as folder, patch.object(scan, "OUTBOX", Path(folder) / "pending.json"):
             app.send_record(row)
-            self.assertEqual(json.loads(scan.OUTBOX.read_text()), [row])
+            self.assertEqual(json.loads(scan.OUTBOX.read_text(encoding="utf-8")), [row])
             self.assertEqual(app.saved, {})
             app.submit.call_args.args[2](TimeoutError("offline"))
             self.assertIn(scan.row_key(row), app.errors)
-            self.assertEqual(json.loads(scan.OUTBOX.read_text()), [row])
+            self.assertEqual(json.loads(scan.OUTBOX.read_text(encoding="utf-8")), [row])
             app.retry()
             app.submit.call_args.args[1](row)
-            self.assertEqual(json.loads(scan.OUTBOX.read_text()), [])
+            self.assertEqual(json.loads(scan.OUTBOX.read_text(encoding="utf-8")), [])
             self.assertEqual(app.saved[scan.row_key(row)], row)
             self.assertEqual(app.pending, {})
 

@@ -9,7 +9,7 @@ BASE = Path(__file__).resolve().parent
 
 
 def publish():
-    terms = validate_terms(json.loads((BASE / "reports/academic_terms.json").read_text()))
+    terms = validate_terms(json.loads((BASE / "reports/academic_terms.json").read_text(encoding="utf-8")))
     source = AttendanceSheets().connect()
     raw = source.get_all_values()
     expected, excluded = normalize(raw, terms, include_absence=True)
